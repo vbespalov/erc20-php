@@ -24,15 +24,5 @@
         "src"
       ]
     }
-  },
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "git@github.com:maxbitsolution/ethereum-rpc.git"
-    },
-    {
-      "type": "vcs",
-      "url": "git@github.com:maxbitsolution/http-client.git"
-    }
-  ]
+  }
 }
