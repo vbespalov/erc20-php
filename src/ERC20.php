@@ -1,9 +1,9 @@
 <?php
-/*
+/**
  * This file is a part of "furqansiddiqui/erc20-php" package.
  * https://github.com/furqansiddiqui/erc20-php
  *
- * Copyright (c) Furqan A. Siddiqui <hello@furqansiddiqui.com>
+ * Copyright (c) 2020 Furqan A. Siddiqui <hello@furqansiddiqui.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code or visit following link:
@@ -12,35 +12,58 @@
 
 declare(strict_types=1);
 
-namespace FurqanSiddiqui\Ethereum\ERC20;
+namespace ERC20;
 
-use FurqanSiddiqui\Ethereum\Buffers\EthereumAddress;
-use FurqanSiddiqui\Ethereum\Contracts\Contract;
-use FurqanSiddiqui\Ethereum\RPC\Abstract_RPC_Client;
+use EthereumRPC\EthereumRPC;
 
 /**
  * Class ERC20
- * @package FurqanSiddiqui\Ethereum\ERC20
+ * @package ERC20
  */
 class ERC20
 {
+    /** @var EthereumRPC */
+    private $client;
+    /** @var string */
+    private $abiPath;
+
     /**
-     * @param \FurqanSiddiqui\Ethereum\RPC\Abstract_RPC_Client $rpcClient
-     * @param \FurqanSiddiqui\Ethereum\Contracts\Contract $abi
+     * ERC20 constructor.
+     * @param EthereumRPC $ethereumRPC
      */
-    public function __construct(
-        public readonly Abstract_RPC_Client $rpcClient,
-        public readonly Contract            $abi = new BaseERC20Contract(),
-    )
+    public function __construct(EthereumRPC $ethereumRPC)
     {
+        $this->client = $ethereumRPC;
+        $this->reset();
     }
 
     /**
-     * @param \FurqanSiddiqui\Ethereum\Buffers\EthereumAddress $address
-     * @return \FurqanSiddiqui\Ethereum\ERC20\ERC20_Token
+     * @return ERC20
      */
-    public function deployedAt(EthereumAddress $address): ERC20_Token
+    public function reset(): self
     {
-        return new ERC20_Token($this->abi, $address, $this->rpcClient);
+        $this->abiPath = sprintf('%1$s%2$sdata%2$serc20.abi', dirname(__FILE__, 2), DIRECTORY_SEPARATOR);
+        return $this;
+    }
+
+    /**
+     * @param string $path
+     * @return ERC20
+     */
+    public function abiPath(?string $path = null): self
+    {
+        $this->abiPath = $path;
+        return $this;
+    }
+
+    /**
+     * @param string $contractAddress
+     * @return ERC20_Token
+     * @throws \EthereumRPC\Exception\ContractsException
+     */
+    public function token(string $contractAddress): ERC20_Token
+    {
+        $contract = $this->client->contract()->load($this->abiPath);
+        return new ERC20_Token($this->client, $contract->abi(), $contractAddress);
     }
 }

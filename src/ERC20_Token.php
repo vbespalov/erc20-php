@@ -1,9 +1,9 @@
 <?php
-/*
+/**
  * This file is a part of "furqansiddiqui/erc20-php" package.
  * https://github.com/furqansiddiqui/erc20-php
  *
- * Copyright (c) Furqan A. Siddiqui <hello@furqansiddiqui.com>
+ * Copyright (c) 2020 Furqan A. Siddiqui <hello@furqansiddiqui.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code or visit following link:
@@ -12,178 +12,211 @@
 
 declare(strict_types=1);
 
-namespace FurqanSiddiqui\Ethereum\ERC20;
+namespace ERC20;
 
-use FurqanSiddiqui\Ethereum\Buffers\EthereumAddress;
-use FurqanSiddiqui\Ethereum\Contracts\DeployedContract;
-use FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException;
+use ERC20\Exception\ERC20Exception;
+use EthereumRPC\Contracts\Contract;
+use EthereumRPC\Validator;
 
 /**
  * Class ERC20_Token
  * @package ERC20
  */
-class ERC20_Token extends DeployedContract
+class ERC20_Token extends Contract
 {
-    /** @var string|null */
-    private ?string $_name = null;
-    /** @var string|null */
-    private ?string $_symbol = null;
-    /** @var int|null */
-    private ?int $_decimals = null;
-    /** @var string|null */
-    private ?string $_totalSupply = null;
+    /** @var null|string */
+    private $_name;
+    /** @var null|string */
+    private $_symbol;
+    /** @var null|int */
+    private $_decimals;
 
     /**
      * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \Exception
+     * @throws \HttpClient\Exception\HttpClientException
      */
     public function name(): string
     {
-        return $this->constantCall("name", "_name", fn(string $name): string => $this->cleanOutputASCII($name));
+        if ($this->_name) {
+            return $this->_name;
+        }
+
+        $result = $this->call("name");
+        $name = $result[0] ?? null;
+        if (!is_string($name)) {
+            throw new ERC20Exception('Failed to retrieve ERC20 token name');
+        }
+
+        $this->_name = $this->trim($name);
+        return $this->_name;
     }
 
     /**
      * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
+     * @throws ERC20Exception
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \Exception
+     * @throws \HttpClient\Exception\HttpClientException
      */
     public function symbol(): string
     {
-        return $this->constantCall("symbol", "_symbol", fn(string $symbol): string => $this->cleanOutputASCII($symbol));
+        if ($this->_symbol) {
+            return $this->_symbol;
+        }
+
+        $result = $this->call("symbol");
+        $code = $result[0] ?? null;
+        if (!is_string($code)) {
+            throw new ERC20Exception('Failed to retrieve ERC20 token symbol');
+        }
+
+        $this->_symbol = $this->trim($code);
+        return $this->_symbol;
     }
 
     /**
      * @return int
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
+     * @throws ERC20Exception
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \Exception
+     * @throws \HttpClient\Exception\HttpClientException
      */
     public function decimals(): int
     {
-        return $this->constantCall("decimals", "_decimals", fn(string $dec): int => intval($dec));
+        if ($this->_decimals) {
+            return $this->_decimals;
+        }
+
+        $result = $this->call("decimals");
+        $scale = intval($result[0] ?? null);
+        if (is_null($scale)) {
+            throw new ERC20Exception('Failed to retrieve ERC20 token decimals/scale value');
+        }
+
+        $this->_decimals = $scale;
+        return $this->_decimals;
+    }
+
+    /**
+     * @param string $address
+     * @param bool $scaled
+     * @return string
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \Exception
+     * @throws \HttpClient\Exception\HttpClientException
+     */
+    public function balanceOf(string $address, bool $scaled = true): string
+    {
+        if (!Validator::Address($address)) {
+            throw new ERC20Exception('Invalid address to check balance of');
+        }
+
+        $result = $this->call("balanceOf", [$address]);
+        /** @var string $balance */
+        $balance = $result["balance"] ?? null;
+        if (!Validator::BcAmount($balance)) {
+            throw new ERC20Exception(
+                sprintf('Failed to retrieve ERC20 token balance of address "%s..."', substr($address, 0, 8))
+            );
+        }
+
+        if (!$scaled) {
+            return $balance;
+        }
+
+        $scale = $this->decimals();
+        return bcdiv($balance, bcpow("10", strval($scale), 0), $scale);
     }
 
     /**
      * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
+     * @throws ERC20Exception
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \HttpClient\Exception\HttpClientException
      */
     public function totalSupply(): string
     {
-        return $this->constantCall("totalSupply", "_totalSupply", null);
-    }
-
-    /**
-     * @param \FurqanSiddiqui\Ethereum\Buffers\EthereumAddress $address
-     * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
-     */
-    public function balanceOf(EthereumAddress $address): string
-    {
-        $balance = $this->call("balanceOf", [strval($address)])["balance"] ?? null;
-        if (!is_string($balance)) {
-            throw new ERC20TokenException('Failed to retrieve address token balance');
+        $result = $this->call("totalSupply");
+        $totalSupply = $result[0] ?? null;
+        if (!Validator::BcAmount($totalSupply)) {
+            throw new ERC20Exception('Failed to retrieve total supply amount');
         }
 
-        return $balance;
+        $scale = $this->decimals();
+        return bcdiv($totalSupply, bcpow("10", strval($scale), 0), $scale);
     }
 
     /**
-     * @param \FurqanSiddiqui\Ethereum\Buffers\EthereumAddress $dest
-     * @param int|string $amount
-     * @return string
-     * @throws \FurqanSiddiqui\Ethereum\Exception\Contract_ABIException
+     * @param string $to
+     * @param string $amount
+     * @return bool
+     * @throws ERC20Exception
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \HttpClient\Exception\HttpClientException
      */
-    public function encodeTransferData(EthereumAddress $dest, int|string $amount): string
+    public function transfer(string $to, string $amount): bool
     {
-        return $this->encodeCall("transfer", [strval($dest), strval($amount)]);
-    }
-
-    /**
-     * @param string $value
-     * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
-     */
-    public function fromScaledValue(string $value): string
-    {
-        return bcmul($value, bcpow("10", strval($this->decimals()), 0), 0);
-    }
-
-    /**
-     * @param int|string $value
-     * @return string
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
-     */
-    public function getScaledValue(int|string $value): string
-    {
-        return bcdiv(strval($value), bcpow("10", strval($this->decimals()), 0), $this->decimals());
-    }
-
-    /**
-     * @param string $func
-     * @param string $prop
-     * @param callable|null $manipulator
-     * @return mixed
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
-     */
-    private function constantCall(string $func, string $prop, ?callable $manipulator): mixed
-    {
-        if (isset($this->$prop)) {
-            return $this->$prop;
+        if (!Validator::Address($to)) {
+            throw new ERC20Exception('Invalid transfer to address');
         }
 
-        $constant = $this->call($func);
-        if (!array_key_exists(0, $constant)) {
-            throw new ERC20TokenException('Failed to retrieve ERC20 token ' . $prop);
+        if (!Validator::BcAmount($amount)) {
+            throw new ERC20Exception('Invalid transaction amount');
         }
 
-        $constant = $constant[0];
-        if ($manipulator) {
-            $constant = $manipulator($constant);
+        $result = $this->call("transfer", [$to, $amount]);
+        $transfer = $result[0] ?? null;
+        if (!is_bool($transfer)) {
+            throw new ERC20Exception('Failed to retrieve transfer response');
         }
 
-        $this->$prop = $constant;
-        return $this->$prop;
+        return $transfer;
     }
 
     /**
-     * @return array
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
+     * @param string $to
+     * @param string $amount
+     * @return string
+     * @throws ERC20Exception
+     * @throws \EthereumRPC\Exception\ConnectionException
+     * @throws \EthereumRPC\Exception\ContractABIException
+     * @throws \EthereumRPC\Exception\GethException
+     * @throws \HttpClient\Exception\HttpClientException
      */
-    public function __debugInfo(): array
+    public function encodedTransferData(string $to, string $amount): string
     {
-        return $this->toArray();
+        if (!Validator::Address($to)) {
+            throw new ERC20Exception('Invalid transfer to address');
+        }
+
+        if (!Validator::BcAmount($amount)) {
+            throw new ERC20Exception('Invalid transaction amount');
+        }
+
+        $amount = bcmul($amount, bcpow("10", strval($this->decimals()), 0), 0);
+        return $this->abi()->encodeCall("transfer", [$to, $amount]);
     }
 
     /**
-     * @return void
+     * @param string $in
+     * @return string
      */
-    public function purgeCached(): void
+    private function trim(string $in): string
     {
-        $this->_name = null;
-        $this->_symbol = null;
-        $this->_decimals = null;
-        $this->_totalSupply = null;
-    }
-
-    /**
-     * @return array
-     * @throws \FurqanSiddiqui\Ethereum\ERC20\Exception\ERC20TokenException
-     * @throws \FurqanSiddiqui\Ethereum\Exception\EthereumException
-     */
-    public function toArray(): array
-    {
-        return [
-            "deployedAt" => $this->deployedAt->toString(true),
-            "name" => $this->name(),
-            "symbol" => $this->symbol(),
-            "decimals" => $this->decimals(),
-            "totalSupply" => $this->totalSupply()
-        ];
+        return preg_replace('/[^\w]/', '', trim($in));
     }
 }
