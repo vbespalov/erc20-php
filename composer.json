@@ -1,5 +1,5 @@
 {
-  "name": "maxbitsolution/erc20-php",
+  "name": "vbespalov/erc20-php",
   "type": "library",
   "description": "Interact with any ERC20 standard/backward-compatible Ethereum token",
   "keywords": [
@@ -16,7 +16,7 @@
   "require": {
     "php": "^7.2.5 || ^8.0",
     "ext-bcmath": "*",
-    "maxbitsolution/ethereum-rpc": "^1.0"
+    "vbespalov/ethereum-rpc": "^1.0"
   },
   "autoload": {
     "psr-4": {
